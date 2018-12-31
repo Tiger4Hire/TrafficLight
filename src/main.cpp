@@ -1,26 +1,24 @@
 #include "standard.h"
 #include "Agent.h"
 #include "TrafficLights.h"
+#include "glu_objs.h"
 
 #include <GL/glut.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
 
 #include <iostream>
 #include <stdlib.h>
 using namespace std;
 
-static GLfloat spin = 0.0;
 static GLfloat speed = 0.0;
-static int running = 0;
 float lngh;
 float width;
 float depth;
 int i;
-
 void box(float lngh, float width, float depth);
-void Fan_Physics();
-void Fan_Render();
+void Update();
+void Render();
+
+TrafficLight lights;
 
 void init(void)
 {
@@ -57,56 +55,9 @@ void display(void)
     glTranslatef(0.0, 0.0, -4.0);
     gluLookAt(5, 5, 5, 0, 1.5, 0, 0, 1, 0);
     // Fan_Physics();
-    Fan_Render();
+    lights.Render();
     glutSwapBuffers();
     glutPostRedisplay();
-}
-
-void Fan_Physics(void)
-{
-    if (running == 1)
-        speed = speed + 0.9;
-    if (speed > 360.0)
-        speed = 360.0;
-    if (running == 0)
-        speed = speed - 1.8;
-    if (speed < 0)
-        speed = 0;
-    spin = spin + speed / 100;
-    // glutPostRedisplay();
-}
-
-void Fan_Render(void)
-{
-    glPushMatrix();
-    /* Fan*/
-    glPushMatrix();
-    GLfloat mat_amb_diff_color_red[] = {1.0, 0.5, 0.0, 0.5};
-    GLfloat mat_amb_diff_color_green[] = {0.0, 1.0, 0.0, 0.5};
-    glTranslatef(0.0, 2.0, 0.5);
-    glRotatef(spin, 0.0, 0.0, 1.0);
-    for (i = 1; i <= 360; i = i + 60)
-    {
-        glPushMatrix();
-        glRotatef(i, 0.0, 0.0, 1.0);
-        glTranslatef(1.5, 0.0, 0.0);
-        glRotatef(-45, 1.0, 0.0, 0.0);
-        glShadeModel(GL_FLAT);
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_LIGHTING);
-        glEnable(GL_LIGHT0);
-        // glMaterialfv_p(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, mat_amb_diff_color);
-        glPushMatrix();
-        /*calling Box ie: drawing the Blade of the fan*/
-        glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, mat_amb_diff_color_green);
-        box(1.0, 0.3, 0.01);
-        // glEnable(GL_LIGHTING);
-        glPopMatrix();
-        glPopMatrix();
-    }
-    glPopMatrix();
-    glPopMatrix();
-    glPopMatrix();
 }
 
 void reshape(int w, int h)
@@ -125,28 +76,27 @@ void keyboard(unsigned char key, int x, int y)
             exit(0);
             break;
         case ' ':
-            if (running == 0) {
-                running = 1;
-                glutIdleFunc(Fan_Physics);
-            }
-            else {
-                running = 0;
-                glutIdleFunc(Fan_Physics);
-            }
+            lights.Step();
+            break;
     }
 }
-
+void Update()
+{
+    lights.Update();
+}
 int main(int argc, char** argv)
 {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowSize(640, 480);
     glutInitWindowPosition(0, 0);
-    glutCreateWindow("                   press  SpaceBar to toggle fan rotation");
+    glutCreateWindow(
+        "                   press  SpaceBar to toggle fan rotation");
     init();
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
     glutKeyboardFunc(keyboard);
+    glutIdleFunc(Update);
     glutMainLoop();
     return 0;
 }

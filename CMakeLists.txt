@@ -14,7 +14,7 @@ add_compile_options(
 target_link_libraries(TrafficLights glut GL GLU gtest pthread boost_system)
 include_directories(include)
 
-set(SOURCES2 ${SOURCES})
-#set(SOURCES2 ${SOURCES2} src/XXXX.cpp)
-add_executable(tests ${SOURCES2})
-target_link_libraries(tests gtest_main gtest pthread boost_system)
+#set(SOURCES2 ${SOURCES})
+##set(SOURCES2 ${SOURCES2} src/XXXX.cpp)
+#add_executable(tests ${SOURCES2})
+#target_link_libraries(tests gtest_main gtest pthread boost_system)
