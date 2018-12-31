@@ -2,6 +2,7 @@
 
 #include "glu_objs.h"
 #include "Agent.h"
+#include "Behaviors.h"
 #include <array>
 #include <chrono>
 #include <optional>
@@ -21,6 +22,7 @@ public:
     void Render() const;
     void Goto(State);
     State GetCurrent();
+    void Deactivate() { deactivate = true; }
 
 private:
     enum class Colour { RED, AMBER, GREEN, MAX };
@@ -34,35 +36,33 @@ private:
     State current{State::RED};
     std::atomic<State> target{State::RED};
     std::optional<std::chrono::high_resolution_clock::time_point> prev_update;
+    bool deactivate{false};
+
     TargetStateValues ToVals(State state);
 };
 
-
-class Behavior {
-public:
-    Behavior() noexcept = default;
-    Behavior(Behavior&&) = default;
-    Behavior(const Behavior&) = default;
-    Behavior& operator=(Behavior&&) = default;
-    Behavior& operator=(const Behavior&) = default;
-
-    enum Result { FAIL, PENDING, SUCCESS };
-    virtual Result Update(int tgt, int& current, TrafficLight&) = 0;
-    virtual void Undo(int& current, TrafficLight&) = 0;
-};
-
 // Wait for something to do
-class Wait : public Behavior {
+using TrafficLightBehavior = Behavior<TrafficLight, int>;
+using TrafficLightAll = All<TrafficLight, int>;
+using TrafficLightAny = Any<TrafficLight, int>;
+
+class Wait : public TrafficLightBehavior {
 public:
     Result Update(int tgt, int& current, TrafficLight&) final;
     void Undo(int& current, TrafficLight&) final;
 };
 
 // Step SM forward
-class Step : public Behavior {
+class Step : public TrafficLightBehavior {
     std::optional<TrafficLight::State> prev_state;
     TrafficLight::State target_state = TrafficLight::State::MAX;
 
+public:
+    Result Update(int tgt, int& current, TrafficLight&) final;
+    void Undo(int& current, TrafficLight&) final;
+};
+
+class Enough : public TrafficLightBehavior {
 public:
     Result Update(int tgt, int& current, TrafficLight&) final;
     void Undo(int& current, TrafficLight&) final;
@@ -79,7 +79,10 @@ class TrafficLightSM : AgentObject {
     int num_state_changes{0};
     Wait wait_behavior;
     Step step_behavior;
-    bool was_stepping{false};
+    Enough enough_behavior;
+    TrafficLightAll normal_behavior;
+    TrafficLightAny complete_behavior;
+
 public:
     TrafficLightSM(TrafficLight&);
 
@@ -89,7 +92,7 @@ public:
         num_button_presses--;
         num_button_presses = std::max(num_button_presses, num_state_changes);
     }
-    void Update();
+    bool Update();
 };
 
 using TrafficLightController = Agent<TrafficLightSM>;

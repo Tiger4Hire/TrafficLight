@@ -6,7 +6,7 @@
 
 namespace {
 using State = TrafficLight::State;
-using Result = Behavior::Result;
+using Result = TrafficLightBehavior::Result;
 #define STRINGIFY(X) \
     case State::X:   \
         return #X
@@ -21,8 +21,7 @@ std::string to_string(State v)
             return "BAD_VALUE";
     }
 }
-constexpr State next_state[Max<State>()] = {State::AMBER, State::RED,
-                                            State::RED_AMBER, State::GREEN};
+constexpr State next_state[Max<State>()] = {State::AMBER, State::RED, State::RED_AMBER, State::GREEN};
 State Next(State prev)
 {
     const auto current = static_cast<int>(prev);
@@ -31,16 +30,12 @@ State Next(State prev)
 
 void Output(const std::string& v)
 {
-    glutStrokeString(GLUT_STROKE_ROMAN,
-                     reinterpret_cast<const unsigned char*>(v.c_str()));
+    glutStrokeString(GLUT_STROKE_ROMAN, reinterpret_cast<const unsigned char*>(v.c_str()));
 }
 
 int Width(const std::string& v)
 {
-    const auto fn = [](int v, char c) {
-        return v + glutStrokeWidth(GLUT_STROKE_ROMAN,
-                                   static_cast<unsigned char>(c));
-    };
+    const auto fn = [](int v, char c) { return v + glutStrokeWidth(GLUT_STROKE_ROMAN, static_cast<unsigned char>(c)); };
     return std::accumulate(std::begin(v), std::end(v), 0, fn);
 }
 }  // namespace
@@ -52,9 +47,8 @@ TrafficLight::StateValues TrafficLight::targets = {{false, false, true},
 void TrafficLight::Render() const
 {
     glPushMatrix();
-    const GLfloat mat_amb_diff_colors[3][4] = {{1.0f, 0.0f, 0.0f, 0.5f},
-                                               {0.7f, 0.5f, 0.0f, 0.5f},
-                                               {0.0f, 1.0f, 0.0f, 0.5f}};
+    const GLfloat mat_amb_diff_colors[3][4] = {
+        {1.0f, 0.0f, 0.0f, 0.5f}, {0.7f, 0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f, 0.5f}};
     GLfloat target_cols[3][4];
     using namespace std;
     static_assert(Max<Colour>() == size(mat_amb_diff_colors));
@@ -81,6 +75,8 @@ void TrafficLight::Render() const
     glPushMatrix();
     glColor4f(1.f, 1.f, 1.f, 1.f);
     std::string text = to_string(current);
+    if (deactivate)
+        text = "BROKEN";
     glTranslatef(-Width(text) / (152.38 * 2), 8, 0);
     glScalef(1 / 152.38, 1 / 152.38, 1 / 152.38);
     Output(text);
@@ -93,8 +89,7 @@ TrafficLight::TargetStateValues TrafficLight::ToVals(State state)
     using namespace std;
     const auto to_float = [](bool v) { return v ? 1.f : 0.f; };
     const auto target_span = gsl::make_span(targets);
-    const auto colour_span =
-        gsl::make_span(target_span[static_cast<int>(state)]);
+    const auto colour_span = gsl::make_span(target_span[static_cast<int>(state)]);
     transform(begin(colour_span), end(colour_span), begin(retval), to_float);
     return retval;
 }
@@ -105,16 +100,10 @@ void TrafficLight::Update()
     using namespace std;
     using namespace std::chrono;
     const auto time = high_resolution_clock::now();
-    const float step =
-        prev_update
-            ? duration_cast<milliseconds>(time - prev_update.value()).count() /
-                  1000.f
-            : 0.f;
+    const float step = prev_update ? duration_cast<milliseconds>(time - prev_update.value()).count() / 1000.f : 0.f;
     prev_update = time;
     const TargetStateValues tgt = ToVals(target_copy);
-    const auto converge_fn = [this, step](float a, float b) {
-        return a + clamp(b - a, -step * speed, step * speed);
-    };
+    const auto converge_fn = [this, step](float a, float b) { return a + clamp(b - a, -step * speed, step * speed); };
     transform(begin(state), end(state), begin(tgt), begin(state), converge_fn);
     if (tgt == state)
         current = target_copy;
@@ -129,6 +118,15 @@ void TrafficLight::Goto(State s)
 {
     target = s;
 }
+
+Result Enough::Update(int tgt, int& crnt, TrafficLight& controlled_object)
+{
+    if (crnt < 10)
+        return Result::PENDING;
+    controlled_object.Deactivate();
+    return Result::FAIL;
+}
+void Enough::Undo(int&, TrafficLight&) {}  // nothing to do
 
 Result Wait::Update(int tgt, int& crnt, TrafficLight&)
 {
@@ -158,17 +156,19 @@ void Step::Undo(int&, TrafficLight& controlled_object)
     prev_state.reset();
 }
 
-TrafficLightSM::TrafficLightSM(TrafficLight& t) : controlled_object(t) {}
+TrafficLightSM::TrafficLightSM(TrafficLight& t) : controlled_object(t)
+{
+    normal_behavior = wait_behavior && step_behavior;
+    complete_behavior = enough_behavior || normal_behavior;
+}
 
-void TrafficLightSM::Update()
+bool TrafficLightSM::Update()
 {
     const auto tgt = num_button_presses;
     auto& crnt = num_state_changes;
-    bool is_stepping =
-        wait_behavior.Update(tgt, crnt, controlled_object) == Result::SUCCESS;
-    if (is_stepping)
-        step_behavior.Update(tgt, crnt, controlled_object);
-    else if (was_stepping)
-        step_behavior.Undo(crnt, controlled_object);
-    was_stepping = is_stepping;
+    if (complete_behavior.Update(tgt, crnt, controlled_object) == Result::FAIL) {
+        complete_behavior.Undo(crnt, controlled_object);
+        return true;
+    }
+    return false;
 }

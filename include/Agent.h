@@ -24,8 +24,7 @@ class Agent {
     {
         if (!quit) {
             t.expires_from_now(boost::posix_time::milliseconds(20));
-            t.async_wait(
-                [this](boost::system::error_code ec) { HandleTick(ec); });
+            t.async_wait([this](boost::system::error_code ec) { HandleTick(ec); });
         }
     }
 

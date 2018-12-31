@@ -78,7 +78,6 @@ void keyboard(unsigned char key, int x, int y)
 {
     switch (key) {
         case '\e':
-            light_controller.Send(QuitAgent{});
             glutLeaveMainLoop();
             break;
         case ' ':
@@ -110,6 +109,7 @@ int main(int argc, char** argv)
     std::thread controller_runner([]() { light_controller.Run(); });
     glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
     glutMainLoop();
+    light_controller.Send(QuitAgent{});
     controller_runner.join();
     return 0;
 }

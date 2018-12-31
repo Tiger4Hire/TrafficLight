@@ -61,3 +61,11 @@ of BTs. Preceeding states can be used as preconditions for later ones, simplifyi
 requirements. Also, each behavior is meaningful in it's own right, making them both testable and
 reusable.
 
+Demo 7
+A completely contrived example, consider the example that we want to model the traffic lights
+have problem that they brake after 10 cycles. We can add the behavior "Enough". Enough counts
+to 10, and then blocks the other behaviors`.
+This is an example of an "Any" behavior (Select). It models conditions that are independent.
+Like "All" (Sequence) behaviors, the order of declaration is important, as the first condition
+that succeeds (or fails) will block the others.  
+
