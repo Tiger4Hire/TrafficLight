@@ -19,6 +19,7 @@ void Update();
 void Render();
 
 TrafficLight lights;
+TrafficLightController light_controller(lights);
 
 void init(void)
 {
@@ -79,7 +80,7 @@ void keyboard(unsigned char key, int x, int y)
             exit(0);
             break;
         case ' ':
-            lights.Step();
+            light_controller.Send(ButtonPress{});
             break;
     }
 }
@@ -101,6 +102,7 @@ int main(int argc, char** argv)
     glutReshapeFunc(reshape);
     glutKeyboardFunc(keyboard);
     glutIdleFunc(Update);
+    std::thread controller_runner([](){light_controller.Run();});
     glutMainLoop();
     return 0;
 }

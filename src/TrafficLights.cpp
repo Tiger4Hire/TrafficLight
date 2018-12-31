@@ -1,3 +1,4 @@
+#include "standard.h"
 #include "TrafficLights.h"
 #include <gsl/gsl>
 #include <numeric>
@@ -93,13 +94,9 @@ TrafficLight::TargetStateValues TrafficLight::ToVals(State state)
     return retval;
 }
 
-void TrafficLight::Step()
-{
-    target = next_state[static_cast<int>(target)];
-}
-
 void TrafficLight::Update()
 {
+    const State target_copy = target;
     using namespace std;
     using namespace std::chrono;
     const auto time = high_resolution_clock::now();
@@ -109,11 +106,33 @@ void TrafficLight::Update()
                   1000.f
             : 0.f;
     prev_update = time;
-    const TargetStateValues tgt = ToVals(target);
+    const TargetStateValues tgt = ToVals(target_copy);
     const auto converge_fn = [this, step](float a, float b) {
         return a + clamp(b - a, -step * speed, step * speed);
     };
     transform(begin(state), end(state), begin(tgt), begin(state), converge_fn);
     if (tgt == state)
-        current = target;
+        current = target_copy;
+}
+
+TrafficLight::State TrafficLight::GetCurrent()
+{
+    return current;
+}
+
+void TrafficLight::Goto(State s)
+{
+    target = s;
+}
+
+TrafficLightSM::TrafficLightSM(TrafficLight& t) : controlled_object(t) {}
+
+void TrafficLightSM::Update()
+{
+    if (change_state) {
+        const auto current = static_cast<int>(controlled_object.GetCurrent());
+        const auto target = next_state[current];
+        controlled_object.Goto(target);
+    }
+    change_state = false;
 }

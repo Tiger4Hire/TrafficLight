@@ -1,9 +1,11 @@
 // requires : GL is initialised (before Update Called)
 
 #include "glu_objs.h"
+#include "Agent.h"
 #include <array>
 #include <chrono>
 #include <optional>
+#include <mutex>
 
 template <class T>
 constexpr int Max()
@@ -18,7 +20,6 @@ public:
     void Update();
     void Render() const;
     void Goto(State);
-    void Step();
     State GetCurrent();
 
 private:
@@ -31,7 +32,22 @@ private:
     GluSphere sphere;
     TargetStateValues state{0.f, 0.f, 1.f};
     State current{State::RED};
-    State target{State::RED};
+    std::atomic<State> target{State::RED};
     std::optional<std::chrono::high_resolution_clock::time_point> prev_update;
     TargetStateValues ToVals(State state);
 };
+
+class ButtonPress {
+};
+class TrafficLightSM : AgentObject {
+    TrafficLight& controlled_object;
+    bool change_state{false};
+
+public:
+    TrafficLightSM(TrafficLight&);
+
+    void Send(ButtonPress) { change_state = true; }
+    void Update();
+};
+
+using TrafficLightController = Agent<TrafficLightSM>;

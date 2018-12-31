@@ -20,6 +20,27 @@ of the system to reduce the complexity of the system. They can look at each stat
 considering the limited changes that my occur in that state. By breaking this assumption, we have 
 rendered the state machine virtually pointless.
 
+Demo 2
+By providing an "agent" we have solved the issue, but we have done so by introducing a syncronization
+point between the two systems. We are not truely asyncronous at this point.
+
+Demo 3
+By removing the mutex and using an atomic, our solution is now "lock-free". However, we now have the
+reverse problem of that we started with. We can now "loose" button presses. The race condition is
+between the controller and the internal update. If we update the controller, just as the light object
+is updating, our "step to next", calculates the new value against the old one.
+The next demo will expose the problem.
+
+Demo 4
+By the addition of a sleep, right next to the race condition, we expose the bug. This version is totally
+artificial, but the problem is now visible.
+A common solution to this problem is to duplicate the state of the asyncronous object in the controller.
+This solution has issues though, it embeds a model of the "model" in the controller, which is obviously
+a weakening of encapsulation. (Functional dependence)
+Instead, a better solution is to go "goal oriented". In goal oriented, we store only a "target state"
+and the controller becomes an (stateless) encapsulation of the problem, "given I am at A, how do I get B"
+where A is the state of the controlled object and B is some target passed in by an external system.
+
 
 
 
