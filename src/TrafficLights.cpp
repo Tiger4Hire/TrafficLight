@@ -1,11 +1,42 @@
 #include "TrafficLights.h"
 #include <gsl/gsl>
 #include <numeric>
+#include <GL/freeglut.h>
 
 namespace {
+#define STRINGIFY(X)             \
+    case TrafficLight::State::X: \
+        return #X
+
+std::string to_string(TrafficLight::State v)
+{
+    switch (v) {
+        STRINGIFY(GREEN);
+        STRINGIFY(AMBER);
+        STRINGIFY(RED);
+        STRINGIFY(RED_AMBER);
+        default:
+            return "BAD_VALUE";
+    }
+}
 constexpr TrafficLight::State next_state[Max<TrafficLight::State>()] = {
     TrafficLight::State::AMBER, TrafficLight::State::RED,
     TrafficLight::State::RED_AMBER, TrafficLight::State::GREEN};
+
+void Output(const std::string& v)
+{
+    glutStrokeString(GLUT_STROKE_ROMAN,
+                     reinterpret_cast<const unsigned char*>(v.c_str()));
+}
+
+int Width(const std::string& v)
+{
+    const auto fn = [](int v, char c) {
+        return v + glutStrokeWidth(GLUT_STROKE_ROMAN,
+                                   static_cast<unsigned char>(c));
+    };
+    return std::accumulate(std::begin(v), std::end(v), 0, fn);
+}
 }  // namespace
 TrafficLight::StateValues TrafficLight::targets = {{false, false, true},
                                                    {false, true, false},
@@ -15,7 +46,6 @@ TrafficLight::StateValues TrafficLight::targets = {{false, false, true},
 void TrafficLight::Render() const
 {
     glPushMatrix();
-    glTranslatef(0.0, 9.0, 0.0);
     const GLfloat mat_amb_diff_colors[3][4] = {{1.0f, 0.0f, 0.0f, 0.5f},
                                                {0.7f, 0.5f, 0.0f, 0.5f},
                                                {0.0f, 1.0f, 0.0f, 0.5f}};
@@ -26,6 +56,8 @@ void TrafficLight::Render() const
         for (int col = 0; col < size(state); ++col)
             target_cols[idx][col] = mat_amb_diff_colors[idx][col] * state[idx];
 
+    glPushMatrix();
+    glTranslatef(0.0, 9.0, 0.0);
     glShadeModel(GL_FLAT);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_LIGHTING);
@@ -35,6 +67,17 @@ void TrafficLight::Render() const
         glTranslatef(0.0, -4.5, 0.0);
         sphere.Render(2.f, 100);
     }
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_LIGHTING);
+    glDisable(GL_LIGHT0);
+    glPopMatrix();
+
+    glPushMatrix();
+    glColor4f(1.f, 1.f, 1.f, 1.f);
+    std::string text = to_string(current);
+    glTranslatef(-Width(text) / (152.38 * 2), 8, 0);
+    glScalef(1 / 152.38, 1 / 152.38, 1 / 152.38);
+    Output(text);
     glPopMatrix();
 }
 

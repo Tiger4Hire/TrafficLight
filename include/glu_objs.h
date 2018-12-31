@@ -2,6 +2,7 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 #include <stdexcept>
+    
 
 class GluSphere {
     GLUquadric* light_sphere;

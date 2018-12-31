@@ -10,7 +10,7 @@
 using namespace std;
 
 static GLfloat speed = 0.0;
-float lngh;
+float height;
 float width;
 float depth;
 int i;
@@ -53,8 +53,9 @@ void display(void)
                       /* viewing transformation  */
     // gluLookAt (0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
     glTranslatef(0.0, 0.0, -4.0);
-    gluLookAt(5, 5, 5, 0, 1.5, 0, 0, 1, 0);
+    gluLookAt(0, 0, 10, 0, 0, 0, 0, 1, 0);
     // Fan_Physics();
+    //    glRasterPos2f(-width / 2, -height / 2);
     lights.Render();
     glutSwapBuffers();
     glutPostRedisplay();
@@ -67,6 +68,8 @@ void reshape(int w, int h)
     glLoadIdentity();
     glFrustum(-1.0, 1.0, -1.0, 1.0, 1.5, 20.0);
     glMatrixMode(GL_MODELVIEW);
+    width = w;
+    height = h;
 }
 
 void keyboard(unsigned char key, int x, int y)
@@ -89,9 +92,10 @@ int main(int argc, char** argv)
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowSize(640, 480);
+    width = 640;
+    height = 480;
     glutInitWindowPosition(0, 0);
-    glutCreateWindow(
-        "                   press  SpaceBar to toggle fan rotation");
+    glutCreateWindow("press  SpaceBar to change state");
     init();
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
