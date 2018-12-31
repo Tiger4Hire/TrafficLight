@@ -5,11 +5,11 @@
 #include <GL/freeglut.h>
 
 namespace {
-#define STRINGIFY(X)             \
-    case TrafficLight::State::X: \
+using State = TrafficLight::State;
+#define STRINGIFY(X) \
+    case State::X:   \
         return #X
-
-std::string to_string(TrafficLight::State v)
+std::string to_string(State v)
 {
     switch (v) {
         STRINGIFY(GREEN);
@@ -20,9 +20,13 @@ std::string to_string(TrafficLight::State v)
             return "BAD_VALUE";
     }
 }
-constexpr TrafficLight::State next_state[Max<TrafficLight::State>()] = {
-    TrafficLight::State::AMBER, TrafficLight::State::RED,
-    TrafficLight::State::RED_AMBER, TrafficLight::State::GREEN};
+constexpr State next_state[Max<State>()] = {State::AMBER, State::RED,
+                                            State::RED_AMBER, State::GREEN};
+State Next(State prev)
+{
+    const auto current = static_cast<int>(prev);
+    return next_state[current];
+}
 
 void Output(const std::string& v)
 {
@@ -129,10 +133,14 @@ TrafficLightSM::TrafficLightSM(TrafficLight& t) : controlled_object(t) {}
 
 void TrafficLightSM::Update()
 {
-    if (change_state) {
-        const auto current = static_cast<int>(controlled_object.GetCurrent());
-        const auto target = next_state[current];
-        controlled_object.Goto(target);
+    // update changes, if one seen
+    if (target && target.value() == controlled_object.GetCurrent()) {
+        num_state_changes++;
+        target.reset();
     }
-    change_state = false;
+    // select new target, if one requested
+    if (!target && num_state_changes != num_button_presses) {
+        target = Next(controlled_object.GetCurrent());
+        controlled_object.Goto(target.value());
+    }
 }

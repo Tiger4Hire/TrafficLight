@@ -41,12 +41,13 @@ class ButtonPress {
 };
 class TrafficLightSM : AgentObject {
     TrafficLight& controlled_object;
-    bool change_state{false};
-
+    int num_button_presses{0};
+    int num_state_changes{0};
+    std::optional<TrafficLight::State> target;
 public:
     TrafficLightSM(TrafficLight&);
 
-    void Send(ButtonPress) { change_state = true; }
+    void Send(ButtonPress) { num_button_presses++; }
     void Update();
 };
 

@@ -102,8 +102,10 @@ int main(int argc, char** argv)
     glutReshapeFunc(reshape);
     glutKeyboardFunc(keyboard);
     glutIdleFunc(Update);
-    std::thread controller_runner([](){light_controller.Run();});
+    std::thread controller_runner([]() { light_controller.Run(); });
     glutMainLoop();
+    light_controller.Send(QuitAgent{});
+    controller_runner.join();
     return 0;
 }
 

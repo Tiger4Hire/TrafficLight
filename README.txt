@@ -41,6 +41,11 @@ Instead, a better solution is to go "goal oriented". In goal oriented, we store 
 and the controller becomes an (stateless) encapsulation of the problem, "given I am at A, how do I get B"
 where A is the state of the controlled object and B is some target passed in by an external system.
 
-
+Demo 5
+An extremely simple goal oriented system. The target state is simply a count of the changes requested.
+The controller logic consists of two pieces of logic
+1. If a change was requested, wait for it to happen.
+2. Else if a change is required request one.
+ 
 
 
