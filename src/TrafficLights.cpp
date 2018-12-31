@@ -6,6 +6,7 @@
 
 namespace {
 using State = TrafficLight::State;
+using Result = Behavior::Result;
 #define STRINGIFY(X) \
     case State::X:   \
         return #X
@@ -129,18 +130,45 @@ void TrafficLight::Goto(State s)
     target = s;
 }
 
+Result Wait::Update(int tgt, int& crnt, TrafficLight&)
+{
+    if (tgt == crnt)
+        return Result::PENDING;
+    return Result::SUCCESS;
+}
+void Wait::Undo(int&, TrafficLight&) {}  // nothing to do
+
+Result Step::Update(int, int& crnt, TrafficLight& controlled_object)
+{
+    if (!prev_state) {
+        prev_state = controlled_object.GetCurrent();
+        target_state = Next(prev_state.value());
+        controlled_object.Goto(target_state);
+    }
+    if (target_state != controlled_object.GetCurrent())
+        return Result::PENDING;
+    crnt++;
+    prev_state.reset();
+    return Result::SUCCESS;
+}
+void Step::Undo(int&, TrafficLight& controlled_object)
+{
+    if (prev_state)
+        controlled_object.Goto(prev_state.value());
+    prev_state.reset();
+}
+
 TrafficLightSM::TrafficLightSM(TrafficLight& t) : controlled_object(t) {}
 
 void TrafficLightSM::Update()
 {
-    // update changes, if one seen
-    if (target && target.value() == controlled_object.GetCurrent()) {
-        num_state_changes++;
-        target.reset();
-    }
-    // select new target, if one requested
-    if (!target && num_state_changes != num_button_presses) {
-        target = Next(controlled_object.GetCurrent());
-        controlled_object.Goto(target.value());
-    }
+    const auto tgt = num_button_presses;
+    auto& crnt = num_state_changes;
+    bool is_stepping =
+        wait_behavior.Update(tgt, crnt, controlled_object) == Result::SUCCESS;
+    if (is_stepping)
+        step_behavior.Update(tgt, crnt, controlled_object);
+    else if (was_stepping)
+        step_behavior.Undo(crnt, controlled_object);
+    was_stepping = is_stepping;
 }

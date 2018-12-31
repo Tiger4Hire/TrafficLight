@@ -37,17 +37,58 @@ private:
     TargetStateValues ToVals(State state);
 };
 
+
+class Behavior {
+public:
+    Behavior() noexcept = default;
+    Behavior(Behavior&&) = default;
+    Behavior(const Behavior&) = default;
+    Behavior& operator=(Behavior&&) = default;
+    Behavior& operator=(const Behavior&) = default;
+
+    enum Result { FAIL, PENDING, SUCCESS };
+    virtual Result Update(int tgt, int& current, TrafficLight&) = 0;
+    virtual void Undo(int& current, TrafficLight&) = 0;
+};
+
+// Wait for something to do
+class Wait : public Behavior {
+public:
+    Result Update(int tgt, int& current, TrafficLight&) final;
+    void Undo(int& current, TrafficLight&) final;
+};
+
+// Step SM forward
+class Step : public Behavior {
+    std::optional<TrafficLight::State> prev_state;
+    TrafficLight::State target_state = TrafficLight::State::MAX;
+
+public:
+    Result Update(int tgt, int& current, TrafficLight&) final;
+    void Undo(int& current, TrafficLight&) final;
+};
+// events
 class ButtonPress {
 };
+class Undo {
+};
+// controller
 class TrafficLightSM : AgentObject {
     TrafficLight& controlled_object;
     int num_button_presses{0};
     int num_state_changes{0};
-    std::optional<TrafficLight::State> target;
+    Wait wait_behavior;
+    Step step_behavior;
+    bool was_stepping{false};
 public:
     TrafficLightSM(TrafficLight&);
 
     void Send(ButtonPress) { num_button_presses++; }
+    void Send(Undo)
+    {
+        num_button_presses--;
+        num_button_presses = std::max(num_button_presses, num_state_changes);
+    }
     void Update();
 };
 

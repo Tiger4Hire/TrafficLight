@@ -46,6 +46,18 @@ An extremely simple goal oriented system. The target state is simply a count of 
 The controller logic consists of two pieces of logic
 1. If a change was requested, wait for it to happen.
 2. Else if a change is required request one.
- 
 
+Demo 6
+(includes bug fixes to exit handling)
+Now things are geting interesting. We encapsulated the two behaviors outlined above as seperate
+objects. Each object represents a behavior. A behavior represents a chunk of meaningful action
+that takes us towards our target. Notice the error handling is built into the design. Each
+behavior may FAIL, not used in this design. PENDING menas the action is not complete yet.
+Notice, there is a natural structure forming. It's a little forced right now, but the idea that
+behavior has an "Undo" means that it can be reasoned with - as a transaction. This is one of the
+major benifits of behaviors.
+Using the "Wait" behavior to trigger the undo of the transition is also one of the major features
+of BTs. Preceeding states can be used as preconditions for later ones, simplifying thier design
+requirements. Also, each behavior is meaningful in it's own right, making them both testable and
+reusable.
 

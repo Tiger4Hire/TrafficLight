@@ -4,6 +4,7 @@
 #include "glu_objs.h"
 
 #include <GL/glut.h>
+#include <GL/freeglut.h>
 
 #include <iostream>
 #include <stdlib.h>
@@ -77,10 +78,14 @@ void keyboard(unsigned char key, int x, int y)
 {
     switch (key) {
         case '\e':
-            exit(0);
+            light_controller.Send(QuitAgent{});
+            glutLeaveMainLoop();
             break;
         case ' ':
             light_controller.Send(ButtonPress{});
+            break;
+        case '\b':
+            light_controller.Send(Undo{});
             break;
     }
 }
@@ -96,70 +101,15 @@ int main(int argc, char** argv)
     width = 640;
     height = 480;
     glutInitWindowPosition(0, 0);
-    glutCreateWindow("press  SpaceBar to change state");
+    glutCreateWindow("press  SpaceBar to change state - ESC to exit - Backspace to undo");
     init();
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
     glutKeyboardFunc(keyboard);
     glutIdleFunc(Update);
     std::thread controller_runner([]() { light_controller.Run(); });
+    glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
     glutMainLoop();
-    light_controller.Send(QuitAgent{});
     controller_runner.join();
     return 0;
-}
-
-void box(float lngh, float width, float depth)
-{
-    float a = lngh;
-    float b = width;
-    float c = depth;
-
-    glBegin(GL_QUADS);
-
-    /* Top face of box*/
-
-    glVertex3f(a, b, -c);   // Top right vertex (Top of cube)
-    glVertex3f(-a, b, -c);  // Top left vertex (Top of cube)
-    glVertex3f(-a, b, c);   // Bottom left vertex (Top of cube)
-    glVertex3f(a, b, c);    // Bottom right vertex (Top of cube)
-
-    // Bottom face of box
-
-    glVertex3f(a, -b, -c);   // Top right vertex (Bottom of cube)
-    glVertex3f(-a, -b, -c);  // Top left vertex (Bottom of cube)
-    glVertex3f(-a, -b, c);   // Bottom left vertex (Bottom of cube)
-    glVertex3f(a, -b, c);    // Bottom right vertex (Bottom of cube)
-    glColor3f(1.0, 0.0, 0.0);
-    // Front of box
-
-    glVertex3f(a, b, c);    // Top right vertex (Front)
-    glVertex3f(-a, b, c);   // Top left vertex (Front)
-    glVertex3f(-a, -b, c);  // Bottom left vertex (Front)
-    glVertex3f(a, -b, c);   // Bottom right vertex (Front)
-    glColor3f(1.0, 0.0, 0.0);
-    // Back of box
-
-    glVertex3f(a, -b, -c);   // Bottom right vertex (Back)
-    glVertex3f(-a, -b, -c);  // Bottom left vertex (Back)
-    glVertex3f(-a, b, -c);   // top left vertex (Back)
-    glVertex3f(a, b, -c);    // Top right vertex (Back)
-    glColor3f(1.0, 0.0, 0.0);
-    // Left of box
-
-    glVertex3f(-a, b, c);    // Top right vertex (Left)
-    glVertex3f(-a, b, -c);   // Top left vertex (Left)
-    glVertex3f(-a, -b, -c);  // Bottom left vertex (Left)
-    glVertex3f(-a, -b, c);   // Bottom vertex (Left)
-    glColor3f(1.0, 0.0, 0.0);
-    // Right of box
-
-    glVertex3f(a, b, -c);   // Top right vertex (Right)
-    glVertex3f(a, b, c);    // Top left vertex (Right)
-    glVertex3f(a, -b, c);   // Bottom left vertex (Right)
-    glVertex3f(a, -b, -c);  // Bottom right vertex (Right)
-    glColor3f(1.0, 0.0, 0.0);
-    // End drawing the box
-    glEnd();
-    // return TRUE;
 }
