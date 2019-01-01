@@ -4,45 +4,7 @@
 #include <numeric>
 #include <GL/freeglut.h>
 
-namespace {
-using State = TrafficLight::State;
-using Result = TrafficLightBehavior::Result;
-#define STRINGIFY(X) \
-    case State::X:   \
-        return #X
-std::string to_string(State v)
-{
-    switch (v) {
-        STRINGIFY(GREEN);
-        STRINGIFY(AMBER);
-        STRINGIFY(RED);
-        STRINGIFY(RED_AMBER);
-        default:
-            return "BAD_VALUE";
-    }
-}
-constexpr State next_state[Max<State>()] = {State::AMBER, State::RED, State::RED_AMBER, State::GREEN};
-State Next(State prev)
-{
-    const auto current = static_cast<int>(prev);
-    return next_state[current];
-}
-
-void Output(const std::string& v)
-{
-    glutStrokeString(GLUT_STROKE_ROMAN, reinterpret_cast<const unsigned char*>(v.c_str()));
-}
-
-int Width(const std::string& v)
-{
-    const auto fn = [](int v, char c) { return v + glutStrokeWidth(GLUT_STROKE_ROMAN, static_cast<unsigned char>(c)); };
-    return std::accumulate(std::begin(v), std::end(v), 0, fn);
-}
-}  // namespace
-TrafficLight::StateValues TrafficLight::targets = {{false, false, true},
-                                                   {false, true, false},
-                                                   {true, false, false},
-                                                   {true, true, false}};
+Dispatcher Dispatcher::Inst;
 
 void TrafficLight::Render() const
 {
@@ -71,104 +33,118 @@ void TrafficLight::Render() const
     glDisable(GL_LIGHTING);
     glDisable(GL_LIGHT0);
     glPopMatrix();
-
-    glPushMatrix();
-    glColor4f(1.f, 1.f, 1.f, 1.f);
-    std::string text = to_string(current);
-    if (deactivate)
-        text = "BROKEN";
-    glTranslatef(-Width(text) / (152.38 * 2), 8, 0);
-    glScalef(1 / 152.38, 1 / 152.38, 1 / 152.38);
-    Output(text);
-    glPopMatrix();
-}
-
-TrafficLight::TargetStateValues TrafficLight::ToVals(State state)
-{
-    TargetStateValues retval;
-    using namespace std;
-    const auto to_float = [](bool v) { return v ? 1.f : 0.f; };
-    const auto target_span = gsl::make_span(targets);
-    const auto colour_span = gsl::make_span(target_span[static_cast<int>(state)]);
-    transform(begin(colour_span), end(colour_span), begin(retval), to_float);
-    return retval;
 }
 
 void TrafficLight::Update()
 {
-    const State target_copy = target;
     using namespace std;
     using namespace std::chrono;
     const auto time = high_resolution_clock::now();
     const float step = prev_update ? duration_cast<milliseconds>(time - prev_update.value()).count() / 1000.f : 0.f;
     prev_update = time;
-    const TargetStateValues tgt = ToVals(target_copy);
+    Lights tgt;
+    transform(begin(target), end(target), begin(tgt), [](bool b) { return b ? 1.f : 0.f; });
     const auto converge_fn = [this, step](float a, float b) { return a + clamp(b - a, -step * speed, step * speed); };
     transform(begin(state), end(state), begin(tgt), begin(state), converge_fn);
-    if (tgt == state)
-        current = target_copy;
-}
 
-TrafficLight::State TrafficLight::GetCurrent()
-{
-    return current;
-}
-
-void TrafficLight::Goto(State s)
-{
-    target = s;
-}
-
-Result Enough::Update(int tgt, int& crnt, TrafficLight& controlled_object)
-{
-    if (crnt < 10)
-        return Result::PENDING;
-    controlled_object.Deactivate();
-    return Result::FAIL;
-}
-void Enough::Undo(int&, TrafficLight&) {}  // nothing to do
-
-Result Wait::Update(int tgt, int& crnt, TrafficLight&)
-{
-    if (tgt == crnt)
-        return Result::PENDING;
-    return Result::SUCCESS;
-}
-void Wait::Undo(int&, TrafficLight&) {}  // nothing to do
-
-Result Step::Update(int, int& crnt, TrafficLight& controlled_object)
-{
-    if (!prev_state) {
-        prev_state = controlled_object.GetCurrent();
-        target_state = Next(prev_state.value());
-        controlled_object.Goto(target_state);
+    for (int idx = 0; idx < state.size(); ++idx) {
+        if (state[idx] == tgt[idx] && callbacks[idx]) {
+            callbacks[idx]();
+            callbacks[idx] = nullptr;
+        }
     }
-    if (target_state != controlled_object.GetCurrent())
-        return Result::PENDING;
-    crnt++;
-    prev_state.reset();
-    return Result::SUCCESS;
-}
-void Step::Undo(int&, TrafficLight& controlled_object)
-{
-    if (prev_state)
-        controlled_object.Goto(prev_state.value());
-    prev_state.reset();
 }
 
-TrafficLightSM::TrafficLightSM(TrafficLight& t) : controlled_object(t)
+void TrafficLight::Goto(Colour c, bool onOff, CallbackFn cb)
 {
-    normal_behavior = wait_behavior && step_behavior;
-    complete_behavior = enough_behavior || normal_behavior;
+    int idx = static_cast<int>(c);
+    callbacks[idx] = cb;
+    target[idx] = onOff;
 }
 
-bool TrafficLightSM::Update()
+using Result = TrafficLightBehavior::Result;
+
+Result Set::Update(int tgt, int& crnt, TrafficLight& controlled_object)
 {
-    const auto tgt = num_button_presses;
-    auto& crnt = num_state_changes;
-    if (complete_behavior.Update(tgt, crnt, controlled_object) == Result::FAIL) {
-        complete_behavior.Undo(crnt, controlled_object);
-        return true;
+    if (!sent) {
+        controlled_object.Goto(TrafficLight::Colour::RED, true, [this]() { done = true; });
+        crnt = tgt;
+        sent = true;
     }
-    return false;
+    if (done)
+        return SUCCESS;
+    return PENDING;
+}
+
+void Set::Undo(int& crnt, TrafficLight& controlled_object)
+{
+    controlled_object.Goto(TrafficLight::Colour::RED, false, nullptr);
+}
+
+Result Wait::Update(int, int& current, TrafficLight&)
+{
+    active = count == current;
+    if (!active)
+        return SUCCESS;
+
+    if (timer) {
+        timer.value()++;
+        if (timer.value() > 20) {
+            count++;
+            timer.reset();
+            return SUCCESS;
+        }
+    }
+    return PENDING;
+}
+
+void Wait::OnEvent(const ButtonPress&)
+{
+    if (active && !timer) {
+        std::cout << "Start my timer\n";
+        timer = 0;
+    }
+}
+
+Result SetColour::Update(int, int&, TrafficLight& controlled_object)
+{
+    const auto dist = to ^ sent;
+    for (int i = 0; i < Max<TrafficLight::Colour>(); ++i) {
+        if (dist.test(i)) {
+            timer = 0;
+            TrafficLight::Colour col = static_cast<TrafficLight::Colour>(i);
+            bool tgt_val = to.test(i);
+            std::cout << std::boolalpha << "Setting color " << i << "-" << tgt_val << "\n";
+            controlled_object.Goto(col, tgt_val, [this, tgt_val, i]() { current.set(i, tgt_val); });
+        }
+    }
+    sent = to;
+    timer = std::min(timer + 1, time_max);
+    if (timer < time_max)
+        return PENDING;
+
+    return (current != to) ? PENDING : SUCCESS;
+}
+
+void SetColour::Undo(int&, TrafficLight&)
+{
+    sent = from;
+    current = from;
+}
+
+Result Done::Update(int, int& current, TrafficLight&)
+{
+    std::cout << "Done\n";
+    current++;
+    return SUCCESS;
+}
+
+TrafficLightSM::TrafficLightSM(TrafficLight& co) : controlled_object(co)
+{
+    all = set && wait && red2amberred && amberred2green && green2amber && amber2red && done;
+}
+
+void TrafficLightSM::Update()
+{
+    all.Update(num_button_presses, num_state_changes, controlled_object);
 }

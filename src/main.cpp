@@ -20,8 +20,7 @@ void Update();
 void Render();
 
 TrafficLight lights;
-TrafficLightController light_controller(lights);
-
+TrafficLightController light_controller{lights};
 void init(void)
 {
     GLfloat mat_specular[] = {1.0, 1.0, 1.0, 1.0};

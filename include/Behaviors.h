@@ -119,7 +119,7 @@ private:
 };
 
 template <class Model, class Target, class Current = Target>
-All<Model, Target, Current> operator&&(All<Model, Target, Current>& l, Behavior<Model, Target, Current>& r)
+All<Model, Target, Current> operator&&(All<Model, Target, Current>&& l, Behavior<Model, Target, Current>& r)
 {
     All<Model, Target, Current> retval(l);
     retval.Add(r);
@@ -136,7 +136,7 @@ All<Model, Target, Current> operator&&(Behavior<Model, Target, Current>& l, Beha
 }
 
 template <class Model, class Target, class Current = Target>
-Any<Model, Target, Current> operator||(Any<Model, Target, Current>& l, Behavior<Model, Target, Current>& r)
+Any<Model, Target, Current> operator||(Any<Model, Target, Current>&& l, Behavior<Model, Target, Current>& r)
 {
     Any<Model, Target, Current> retval(l);
     retval.Add(r);
