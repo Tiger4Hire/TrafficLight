@@ -64,87 +64,105 @@ void TrafficLight::Goto(Colour c, bool onOff, CallbackFn cb)
 
 using Result = TrafficLightBehavior::Result;
 
-Result Set::Update(int tgt, int& crnt, TrafficLight& controlled_object)
+void Send(TrafficLight& controlled_object, TrafficLight::Colour col, bool onOff)
 {
-    if (!sent) {
-        controlled_object.Goto(TrafficLight::Colour::RED, true, [this]() { done = true; });
-        crnt = tgt;
-        sent = true;
-    }
-    if (done)
-        return SUCCESS;
-    return PENDING;
+    controlled_object.Goto(col, onOff, [=]() { Dispatcher::Inst.Send(LightChange{col, onOff}); });
 }
 
-void Set::Undo(int& crnt, TrafficLight& controlled_object)
+Result Set::Update(int tgt, LocalState& crnt, TrafficLight& controlled_object)
+{
+    if (!sent) {
+        Send(controlled_object, TrafficLight::Colour::RED, true);
+        crnt.target_count = tgt;
+    }
+    sent = true;  // one shot behavior
+    return SUCCESS;
+}
+
+void Set::Undo(LocalState& crnt, TrafficLight& controlled_object)
 {
     controlled_object.Goto(TrafficLight::Colour::RED, false, nullptr);
 }
 
-Result Wait::Update(int, int& current, TrafficLight&)
+Result Wait::Update(int tgt, LocalState& crnt, TrafficLight&)
 {
-    active = count == current;
+    if (pressed)
+        crnt.target_count++;
+    pressed = false;
+    active = !crnt.target_count;
     if (!active)
         return SUCCESS;
 
-    if (timer) {
-        timer.value()++;
-        if (timer.value() > 20) {
-            count++;
-            timer.reset();
-            return SUCCESS;
-        }
-    }
+    std::cout << "waiting\n";
+    crnt.timer = 20;
     return PENDING;
 }
 
 void Wait::OnEvent(const ButtonPress&)
 {
-    if (active && !timer) {
-        std::cout << "Start my timer\n";
-        timer = 0;
+    if (active) {
+        std::cout << "Start sequence timer\n";
+        pressed = true;
     }
 }
 
-Result SetColour::Update(int, int&, TrafficLight& controlled_object)
+Result WaitOnTimer::Update(int, LocalState& crnt, TrafficLight&)
 {
-    const auto dist = to ^ sent;
-    for (int i = 0; i < Max<TrafficLight::Colour>(); ++i) {
-        if (dist.test(i)) {
-            timer = 0;
-            TrafficLight::Colour col = static_cast<TrafficLight::Colour>(i);
-            bool tgt_val = to.test(i);
-            std::cout << std::boolalpha << "Setting color " << i << "-" << tgt_val << "\n";
-            controlled_object.Goto(col, tgt_val, [this, tgt_val, i]() { current.set(i, tgt_val); });
-        }
-    }
-    sent = to;
-    timer = std::min(timer + 1, time_max);
-    if (timer < time_max)
+    if (crnt.timer) {
+        crnt.timer--;
         return PENDING;
-
-    return (current != to) ? PENDING : SUCCESS;
+    }
+    else
+        return SUCCESS;
 }
 
-void SetColour::Undo(int&, TrafficLight&)
+void WaitOnConfirmation::OnEvent(const LightChange& change)
 {
-    sent = from;
-    current = from;
+    changes.push_back(change);
 }
 
-Result Done::Update(int, int& current, TrafficLight&)
+Result WaitOnConfirmation::Update(int, LocalState& crnt, TrafficLight&)
+{
+    std::cout << crnt.confirmed.to_string() << "\n";
+
+    for (const auto& change : changes)
+        crnt.confirmed[gsl::narrow<int>(change.colour)] = change.new_state;
+    changes.clear();
+    return (crnt.sent != crnt.confirmed) ? SUCCESS : PENDING;
+}
+
+Result SetColour::Update(int tgt, LocalState& crnt, TrafficLight& controlled_object)
+{
+    if (crnt.confirmed == from) {
+        const auto dist = to ^ from;
+        for (int i = 0; i < Max<TrafficLight::Colour>(); ++i) {
+            if (dist.test(i)) {
+                TrafficLight::Colour col = static_cast<TrafficLight::Colour>(i);
+                bool tgt_val = to.test(i);
+                std::cout << std::boolalpha << "Setting color " << i << "-" << tgt_val << "\n";
+                Send(controlled_object, col, tgt_val);
+                crnt.timer = time_max;
+            }
+        }
+        return PENDING;
+    }
+    else
+        return SUCCESS;
+}
+
+Result Done::Update(int, LocalState& crnt, TrafficLight&)
 {
     std::cout << "Done\n";
-    current++;
+    crnt.target_count--;
     return SUCCESS;
 }
 
 TrafficLightSM::TrafficLightSM(TrafficLight& co) : controlled_object(co)
 {
-    all = set && wait && red2amberred && amberred2green && green2amber && amber2red && done;
+    all = set && timer && net_delay && wait && red2amberred && amberred2green && green2amber && amber2red && done;
 }
 
 void TrafficLightSM::Update()
 {
-    all.Update(num_button_presses, num_state_changes, controlled_object);
+    all.Update(num_button_presses, local_state, controlled_object);
 }
